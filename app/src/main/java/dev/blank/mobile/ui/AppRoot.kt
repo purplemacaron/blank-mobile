@@ -1,11 +1,14 @@
 package dev.blank.mobile.ui
 
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 sealed interface Screen {
@@ -36,6 +39,10 @@ val ScreenSaver = Saver<Screen, String>(
 fun AppRoot() {
     val vm: ChatViewModel = viewModel()
     var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.Chat) }
+    val activity = LocalContext.current as? ComponentActivity
+    BackHandler {
+        if (screen != Screen.Chat) screen = Screen.Chat else activity?.moveTaskToBack(true)
+    }
     when (screen) {
         Screen.Chat -> ChatScreen(
             vm = vm,

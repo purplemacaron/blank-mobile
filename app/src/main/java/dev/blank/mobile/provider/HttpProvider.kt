@@ -1,5 +1,6 @@
 package dev.blank.mobile.provider
 
+import dev.blank.mobile.agent.ToolSpec
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,12 +42,18 @@ class HttpProvider(
         system: String,
         messages: List<ChatMessage>,
         maxTokens: Int? = null,
+        tools: List<ToolSpec> = emptyList(),
     ): Flow<StreamEvent> = flow {
         val base = baseUrl.trimEnd('/')
         val body = when (protocol) {
-            "anthropic" -> Anthropic.body(model, system, messages, maxTokens ?: 8192)
-            "gemini" -> Gemini.body(model, system, messages, maxTokens)
-            else -> OpenAiCompat.body(model, system, messages, maxTokens)
+            "anthropic" -> Anthropic.body(model, system, messages, maxTokens ?: 8192, tools)
+            "gemini" -> Gemini.body(model, system, messages, maxTokens, tools)
+            else -> OpenAiCompat.body(model, system, messages, maxTokens, tools)
+        }
+        val decoder: FrameDecoder = when (protocol) {
+            "anthropic" -> Anthropic.Decoder()
+            "gemini" -> Gemini.Decoder()
+            else -> OpenAiCompat.Decoder()
         }
         val url = when (protocol) {
             "anthropic" -> "$base/messages"
@@ -74,14 +81,14 @@ class HttpProvider(
             while (true) {
                 if (source.read(buffer, 8192) == -1L) break
                 for (frame in parser.feed(buffer.readUtf8())) {
-                    for (event in eventsFor(protocol, frame.data)) {
+                    for (event in decodeFrame(decoder, frame.data)) {
                         if (event is StreamEvent.Done) done = true
                         emit(event)
                     }
                 }
             }
             for (frame in parser.flush()) {
-                for (event in eventsFor(protocol, frame.data)) {
+                for (event in decodeFrame(decoder, frame.data)) {
                     if (event is StreamEvent.Done) done = true
                     emit(event)
                 }
@@ -90,13 +97,9 @@ class HttpProvider(
         }
     }.flowOn(Dispatchers.IO)
 
-    private fun eventsFor(protocol: String, data: String): List<StreamEvent> {
+    private fun decodeFrame(decoder: FrameDecoder, data: String): List<StreamEvent> {
         if (data.isEmpty() || data == "[DONE]") return emptyList()
-        return when (protocol) {
-            "anthropic" -> Anthropic.parseFrame(data)
-            "gemini" -> Gemini.parseFrame(data)
-            else -> OpenAiCompat.parseFrame(data)
-        }
+        return decoder.decode(data)
     }
 
     private fun Request.Builder.authHeaders(protocol: String, apiKey: String?) {

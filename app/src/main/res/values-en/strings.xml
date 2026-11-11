@@ -26,4 +26,14 @@
     <string name="sessions_delete">Delete</string>
     <string name="sessions_delete_confirm">Delete this session?</string>
     <string name="cancel">Cancel</string>
+    <string name="accessibility_description">Lets blank mobile read the screen and perform taps, swipes and text input. Screen content may be sent to your connected model provider to process tasks.</string>
+    <string name="accessibility_banner">Turn on the accessibility service to let blank mobile see and operate the screen.</string>
+    <string name="accessibility_enable">Enable</string>
+    <string name="accessibility_battery_note">Some devices stop accessibility services automatically. Exempting blank mobile from battery optimization keeps it running reliably.</string>
+    <string name="accessibility_battery_button">Battery settings</string>
+    <string name="approval_title">Allow this action?</string>
+    <string name="approval_allow">Allow</string>
+    <string name="approval_deny">Deny</string>
+    <string name="approval_always">Always allow</string>
+    <string name="agent_step_limit">Reached the step limit and stopped. Send another instruction to continue.</string>
 </resources>

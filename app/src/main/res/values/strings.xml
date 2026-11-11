@@ -26,4 +26,14 @@
     <string name="sessions_delete">삭제</string>
     <string name="sessions_delete_confirm">이 세션을 삭제할까요?</string>
     <string name="cancel">취소</string>
+    <string name="accessibility_description">blank mobile이 화면을 읽고 탭, 스와이프, 텍스트 입력 등 기기 조작을 수행할 수 있도록 합니다. 화면 내용은 작업 처리를 위해 연결한 모델 프로바이더로 전송될 수 있습니다.</string>
+    <string name="accessibility_banner">접근성 서비스를 켜면 화면을 보고 기기를 조작할 수 있어요.</string>
+    <string name="accessibility_enable">켜기</string>
+    <string name="accessibility_battery_note">일부 기기는 접근성 서비스를 자동으로 종료해요. 배터리 최적화 예외로 설정하면 안정적으로 동작합니다.</string>
+    <string name="accessibility_battery_button">배터리 설정</string>
+    <string name="approval_title">이 작업을 허용할까요?</string>
+    <string name="approval_allow">허용</string>
+    <string name="approval_deny">거부</string>
+    <string name="approval_always">항상 허용</string>
+    <string name="agent_step_limit">단계 한도에 도달해 실행을 멈췄습니다. 이어서 지시해 주세요.</string>
 </resources>
