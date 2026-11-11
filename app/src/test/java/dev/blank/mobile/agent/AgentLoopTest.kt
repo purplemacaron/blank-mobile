@@ -79,6 +79,28 @@ class AgentLoopTest {
     }
 
     @Test
+    fun askUserBypassesApprovalAndFeedsChoiceBack() = runTest {
+        val provider = FakeProvider(
+            listOf(
+                listOf(StreamEvent.ToolCall("q1", "ask_user", """{"question":"Which?","options":["A","B"]}"""), StreamEvent.Done(true)),
+                listOf(StreamEvent.Text("A로 진행"), StreamEvent.Done(true)),
+            ),
+        )
+        var asked: ToolCallRef? = null
+        var approved = false
+        val loop = AgentLoop(
+            stream = provider::stream,
+            execute = { "should not run" },
+            approve = { approved = true; true },
+            ask = { call -> asked = call; "User chose: A" },
+        )
+        assertEquals("A로 진행", loop.run(listOf(ChatMessage("user", "물어봐"))))
+        assertEquals("q1", asked?.id)
+        assertEquals(false, approved)
+        assertTrue(provider.calls[1].any { it.role == "tool" && it.toolCallId == "q1" && it.content.contains("User chose: A") })
+    }
+
+    @Test
     fun plainReplyEndsImmediately() = runTest {
         val provider = FakeProvider(listOf(listOf(StreamEvent.Text("안녕"), StreamEvent.Done(true))))
         val loop = AgentLoop(stream = provider::stream, execute = { "x" }, approve = { true })

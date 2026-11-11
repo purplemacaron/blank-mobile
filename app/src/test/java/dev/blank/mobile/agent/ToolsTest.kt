@@ -1,8 +1,10 @@
 package dev.blank.mobile.agent
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -137,6 +139,25 @@ class ToolsTest {
         Tools.validate("app_control", args { put("action", "uninstall"); put("package", "com.example.app") })
         Tools.validate("app_control", args { put("action", "force_stop"); put("package", "com.example.app") })
         Tools.validate("app_control", args { put("action", "list") })
+    }
+
+    @Test
+    fun askUserRequiresQuestionAndTwoToSixOptions() {
+        assertFailsWith<IllegalArgumentException> { Tools.validate("ask_user", args {}) }
+        assertFailsWith<IllegalArgumentException> {
+            Tools.validate("ask_user", args { put("question", "Which?") })
+        }
+        assertFailsWith<IllegalArgumentException> {
+            Tools.validate("ask_user", args {
+                put("question", "Which?")
+                putJsonArray("options") { add("only") }
+            })
+        }
+        val out = Tools.validate("ask_user", args {
+            put("question", "Which?")
+            putJsonArray("options") { add("A"); add("B") }
+        })
+        assertEquals("Which?", out["question"].toString().trim('"'))
     }
 
     @Test

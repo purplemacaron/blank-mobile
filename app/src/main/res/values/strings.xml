@@ -38,4 +38,14 @@
     <string name="approval_deny">거부</string>
     <string name="approval_always">항상 허용</string>
     <string name="agent_step_limit">단계 한도에 도달해 실행을 멈췄습니다. 이어서 지시해 주세요.</string>
+    <string name="question_title">질문이 있어요</string>
+    <string name="error_provider">프로바이더 오류: %1$s</string>
+    <string name="channel_run">에이전트 실행</string>
+    <string name="channel_attention">승인·질문 알림</string>
+    <string name="notification_running_title">에이전트 실행 중</string>
+    <string name="notification_running_text">blank mobile이 작업을 수행하고 있어요.</string>
+    <string name="notification_approval_title">승인이 필요해요</string>
+    <string name="notification_approval_text">에이전트가 작업 허용을 기다리고 있어요. 앱을 열어 결정해 주세요.</string>
+    <string name="notification_question_title">질문이 있어요</string>
+    <string name="notification_question_text">에이전트가 선택을 기다리고 있어요. 앱을 열어 답해 주세요.</string>
 </resources>

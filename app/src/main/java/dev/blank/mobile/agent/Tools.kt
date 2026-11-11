@@ -100,6 +100,23 @@ object Tools {
                 putJsonArray("required") { add("action") }
             },
         ),
+        ToolSpec(
+            "ask_user",
+            "Ask the user a multiple-choice question and pause until they answer. Use when you need a decision (which app, which option, how to proceed).",
+            buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("question") { put("type", "string") }
+                    putJsonObject("options") {
+                        put("type", "array")
+                        putJsonObject("items") { put("type", "string") }
+                        put("minItems", 2)
+                        put("maxItems", 6)
+                    }
+                }
+                putJsonArray("required") { add("question"); add("options") }
+            },
+        ),
     )
 
     fun validate(name: String, args: JsonObject): JsonObject = when (name) {
@@ -109,6 +126,7 @@ object Tools {
         "device_act" -> validateAct(args)
         "phone_call" -> validatePhone(args)
         "app_control" -> validateApp(args)
+        "ask_user" -> validateAsk(args)
         else -> throw IllegalArgumentException("unknown tool: $name")
     }
 
@@ -157,6 +175,23 @@ object Tools {
                 }
                 else -> throw IllegalArgumentException("invalid action: $action")
             }
+        }
+    }
+
+    private fun validateAsk(args: JsonObject): JsonObject {
+        val question = args.str("question")
+        if (question.isNullOrBlank()) throw IllegalArgumentException("question required")
+        val options = args["options"] as? kotlinx.serialization.json.JsonArray
+            ?: throw IllegalArgumentException("options required")
+        val texts = options.map { element ->
+            element.jsonPrimitive.let { if (it.isString) it.content else throw IllegalArgumentException("options must be strings") }
+        }
+        if (texts.size !in 2..6 || texts.any { it.isBlank() }) {
+            throw IllegalArgumentException("options must be 2-6 non-empty strings")
+        }
+        return buildJsonObject {
+            put("question", question)
+            putJsonArray("options") { texts.forEach { add(it) } }
         }
     }
 

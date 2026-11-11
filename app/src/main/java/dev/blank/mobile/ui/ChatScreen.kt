@@ -49,6 +49,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.blank.mobile.R
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,6 +192,13 @@ fun ChatScreen(vm: ChatViewModel, onSessions: () -> Unit, onSettings: () -> Unit
             }
             vm.pendingApproval?.let { call ->
                 ApprovalCard(detail = vm.describeCall(call), onDecide = { allow, always -> vm.decideApproval(allow, always) })
+            }
+            vm.pendingQuestion?.let { q ->
+                QuestionCard(
+                    question = q["question"]?.jsonPrimitive?.content.orEmpty(),
+                    options = q["options"]?.jsonArray?.map { it.jsonPrimitive.content }.orEmpty(),
+                    onAnswer = vm::answerQuestion,
+                )
             }
             vm.error?.let { error ->
                 Text(

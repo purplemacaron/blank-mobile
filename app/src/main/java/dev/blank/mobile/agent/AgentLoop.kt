@@ -9,6 +9,7 @@ class AgentLoop(
     private val stream: (List<ChatMessage>, List<ToolSpec>) -> Flow<StreamEvent>,
     private val execute: suspend (ToolCallRef) -> String,
     private val approve: suspend (ToolCallRef) -> Boolean,
+    private val ask: suspend (ToolCallRef) -> String = { "User did not answer." },
     private val onText: (String) -> Unit = {},
     private val onReasoning: (String) -> Unit = {},
     private val onToolStart: (ToolCallRef) -> Unit = {},
@@ -38,7 +39,11 @@ class AgentLoop(
             if (calls.isEmpty()) return lastText
             for (call in calls) {
                 onToolStart(call)
-                val result = if (approve(call)) execute(call) else "User denied this action."
+                val result = when {
+                    call.name == "ask_user" -> ask(call)
+                    approve(call) -> execute(call)
+                    else -> "User denied this action."
+                }
                 onToolResult(call, result)
                 messages += ChatMessage("tool", result, toolCallId = call.id)
             }

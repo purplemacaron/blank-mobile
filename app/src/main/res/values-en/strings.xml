@@ -38,4 +38,14 @@
     <string name="approval_deny">Deny</string>
     <string name="approval_always">Always allow</string>
     <string name="agent_step_limit">Reached the step limit and stopped. Send another instruction to continue.</string>
+    <string name="question_title">A question for you</string>
+    <string name="error_provider">Provider error: %1$s</string>
+    <string name="channel_run">Agent run</string>
+    <string name="channel_attention">Approvals &amp; questions</string>
+    <string name="notification_running_title">Agent running</string>
+    <string name="notification_running_text">blank mobile is working on your task.</string>
+    <string name="notification_approval_title">Approval needed</string>
+    <string name="notification_approval_text">The agent is waiting for your approval. Open the app to decide.</string>
+    <string name="notification_question_title">Question waiting</string>
+    <string name="notification_question_text">The agent is waiting for your choice. Open the app to answer.</string>
 </resources>

@@ -11,7 +11,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import dev.blank.mobile.R
+import dev.blank.mobile.AppState
 import dev.blank.mobile.agent.AgentLoop
+import dev.blank.mobile.agent.AgentRunService
 import dev.blank.mobile.agent.ApprovalDecision
 import dev.blank.mobile.agent.ApprovalPolicy
 import dev.blank.mobile.agent.Session
@@ -38,6 +40,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -67,18 +70,27 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var pickRequest by mutableStateOf(false)
         private set
+    var pendingQuestion by mutableStateOf<JsonObject?>(null)
+        private set
 
     private var job: Job? = null
     private var createdAt = System.currentTimeMillis()
     private var approvalDeferred: CompletableDeferred<Boolean>? = null
     private var installDeferred: CompletableDeferred<Uri?>? = null
+    private var questionDeferred: CompletableDeferred<String?>? = null
     private var pendingShot: ImageAttachment? = null
 
     init {
         refreshPermissions()
+        AgentRunService.stopCallback = { stop() }
         viewModelScope.launch {
             BlankAccessibilityService.connected.collect { accessibilityConnected = it }
         }
+    }
+
+    override fun onCleared() {
+        AgentRunService.stopCallback = null
+        AgentRunService.stop(getApplication())
     }
 
     fun refreshPermissions() {
@@ -98,19 +110,25 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             .map { ChatMessage(it.role, it.content) }
         messages = messages + UiMessage("user", trimmed) + UiMessage("assistant", "")
         streaming = true
+        if (accessibilityConnected) AgentRunService.start(getApplication())
         job = viewModelScope.launch {
             try {
                 if (accessibilityConnected) runAgent(history) else runChat(history)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Provider error"
+                error = getApplication<Application>().getString(R.string.error_provider, e.message ?: "unknown")
             } finally {
                 streaming = false
                 pendingApproval = null
                 approvalDeferred = null
                 pickRequest = false
                 installDeferred = null
+                pendingQuestion = null
+                questionDeferred = null
+                AgentRunService.pendingAttention = null
+                AgentRunService.stop(getApplication())
+                AgentRunService.cancelAttention(getApplication())
                 persist()
             }
         }
@@ -157,6 +175,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             },
             execute = ::executeTool,
             approve = ::approveTool,
+            ask = ::askUser,
             onText = { streamIntoAssistant(text = it) },
             onReasoning = { streamIntoAssistant(reasoning = it) },
             onToolStart = { call ->
@@ -238,6 +257,27 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         installDeferred?.complete(uri)
     }
 
+    private suspend fun askUser(call: ToolCallRef): String {
+        val args = Tools.validate("ask_user", Json.parseToJsonElement(call.arguments.ifBlank { "{}" }).jsonObject)
+        val deferred = CompletableDeferred<String?>()
+        questionDeferred = deferred
+        pendingQuestion = args
+        AgentRunService.pendingAttention = R.string.notification_question_title to R.string.notification_question_text
+        if (!AppState.foreground) {
+            AgentRunService.notifyAttention(getApplication(), R.string.notification_question_title, R.string.notification_question_text)
+        }
+        val choice = deferred.await()
+        pendingQuestion = null
+        questionDeferred = null
+        AgentRunService.pendingAttention = null
+        AgentRunService.cancelAttention(getApplication())
+        return if (choice == null) "User dismissed the question." else "User chose: $choice"
+    }
+
+    fun answerQuestion(choice: String) {
+        questionDeferred?.complete(choice)
+    }
+
     fun describeCall(call: ToolCallRef): String {
         val args = try {
             Json.parseToJsonElement(call.arguments.ifBlank { "{}" }).jsonObject
@@ -252,9 +292,15 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         val deferred = CompletableDeferred<Boolean>()
         approvalDeferred = deferred
         pendingApproval = call
+        AgentRunService.pendingAttention = R.string.notification_approval_title to R.string.notification_approval_text
+        if (!AppState.foreground) {
+            AgentRunService.notifyAttention(getApplication(), R.string.notification_approval_title, R.string.notification_approval_text)
+        }
         val allowed = deferred.await()
         pendingApproval = null
         approvalDeferred = null
+        AgentRunService.pendingAttention = null
+        AgentRunService.cancelAttention(getApplication())
         return allowed
     }
 
@@ -267,6 +313,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     fun stop() {
         approvalDeferred?.complete(false)
         installDeferred?.complete(null)
+        questionDeferred?.complete(null)
         job?.cancel()
     }
 
@@ -344,6 +391,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 "app_control handles launch/list/install/uninstall/force_stop. " +
                 "For install, omit path to open the file chooser so the user picks the APK; only pass a path when the file is already readable by the app. " +
                 "System install/uninstall confirmations belong to the user: never tap their OK/Install/Update buttons yourself; after opening one, tell the user to approve it on screen. " +
+                "Use ask_user to ask the user a multiple-choice question when you need a decision; wait for their answer. " +
                 "Take small steps and verify the result of each action. " +
                 "When the task is complete, reply with a brief summary in the user's language and no tool calls."
     }
