@@ -101,4 +101,62 @@ class ToolsTest {
             Tools.validate("device_act", args { put("action", "explode") })
         }
     }
+
+    @Test
+    fun specsCoverPhoneAndAppTools() {
+        val names = Tools.all.map { it.name }
+        assertTrue(names.containsAll(listOf("phone_call", "app_control")))
+    }
+
+    @Test
+    fun phoneCallRequiresValidNumber() {
+        assertFailsWith<IllegalArgumentException> { Tools.validate("phone_call", args { put("action", "call") }) }
+        assertFailsWith<IllegalArgumentException> {
+            Tools.validate("phone_call", args { put("action", "call"); put("number", "abc") })
+        }
+        val out = Tools.validate("phone_call", args { put("action", "call"); put("number", "010-1234-5678") })
+        assertEquals("01012345678", out["number"].toString().trim('"'))
+        Tools.validate("phone_call", args { put("action", "dial"); put("number", "119") })
+    }
+
+    @Test
+    fun phoneStateAndEndNeedNoNumber() {
+        Tools.validate("phone_call", args { put("action", "state") })
+        Tools.validate("phone_call", args { put("action", "answer") })
+        Tools.validate("phone_call", args { put("action", "end") })
+        assertFailsWith<IllegalArgumentException> { Tools.validate("phone_call", args { put("action", "teleport") }) }
+    }
+
+    @Test
+    fun appControlPackageValidation() {
+        assertFailsWith<IllegalArgumentException> { Tools.validate("app_control", args { put("action", "launch") }) }
+        assertFailsWith<IllegalArgumentException> {
+            Tools.validate("app_control", args { put("action", "launch"); put("package", "not a package!") })
+        }
+        Tools.validate("app_control", args { put("action", "launch"); put("package", "com.android.settings") })
+        Tools.validate("app_control", args { put("action", "uninstall"); put("package", "com.example.app") })
+        Tools.validate("app_control", args { put("action", "force_stop"); put("package", "com.example.app") })
+        Tools.validate("app_control", args { put("action", "list") })
+    }
+
+    @Test
+    fun appControlInstallPathOptional() {
+        val out = Tools.validate("app_control", args { put("action", "install") })
+        assertEquals("install", out["action"].toString().trim('"'))
+        assertTrue(!out.containsKey("path"))
+        assertFailsWith<IllegalArgumentException> {
+            Tools.validate("app_control", args { put("action", "install"); put("path", "/data/local/tmp/file.txt") })
+        }
+        Tools.validate("app_control", args { put("action", "install"); put("path", "/data/local/tmp/app.apk") })
+    }
+
+    @Test
+    fun redactMasksPhoneNumber() {
+        val input = args { put("action", "call"); put("number", "010-1234-5678") }
+        val out = Tools.redact("phone_call", input)
+        assertTrue(out.contains("5678"))
+        assertTrue(!out.contains("0101234"))
+        assertTrue(!out.contains("010-1234"))
+        assertEquals(input.toString(), Tools.redact("device_act", input))
+    }
 }

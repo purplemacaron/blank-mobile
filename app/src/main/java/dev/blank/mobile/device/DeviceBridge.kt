@@ -137,6 +137,41 @@ object DeviceBridge {
         }
     }
 
+    fun globalAction(action: Int): Boolean =
+        BlankAccessibilityService.instance?.performGlobalAction(action) ?: false
+
+    suspend fun tapByLabels(labels: List<String>): Boolean {
+        if (tapMatched(collect(), labels)) return true
+        // System windows (notification shade, dialogs) are not the active window.
+        val windows = service().windows.sortedByDescending { it.layer }
+        for (window in windows) {
+            val root = window.root
+            window.recycle()
+            if (root == null) continue
+            if (tapMatched(collectFrom(root), labels)) return true
+        }
+        return false
+    }
+
+    private suspend fun tapMatched(pairs: List<Pair<UiNode, AccessibilityNodeInfo>>, labels: List<String>): Boolean {
+        val match = pairs.firstOrNull { (ui, _) ->
+            labels.any { ui.text.equals(it, ignoreCase = true) || ui.desc.equals(it, ignoreCase = true) }
+        } ?: pairs.firstOrNull { (ui, _) ->
+            labels.any { ui.text.contains(it, ignoreCase = true) || ui.desc.contains(it, ignoreCase = true) }
+        }
+        if (match == null) {
+            pairs.forEach { it.second.recycle() }
+            return false
+        }
+        val live = match.second
+        pairs.forEach { if (it.second !== live) it.second.recycle() }
+        val ok = live.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        val bounds = Rect().also { live.getBoundsInScreen(it) }
+        live.recycle()
+        if (ok) return true
+        return gestureTap(bounds.centerX().toFloat(), bounds.centerY().toFloat(), false).startsWith("Tapped")
+    }
+
     private suspend fun gestureTap(x: Float, y: Float, long: Boolean): String {
         val path = Path().apply { moveTo(x, y) }
         val ok = gesture(path, if (long) 600 else 50)
@@ -183,8 +218,11 @@ object DeviceBridge {
     }
 
     private fun collect(): List<Pair<UiNode, AccessibilityNodeInfo>> {
-        val s = BlankAccessibilityService.instance ?: return emptyList()
-        val root = s.rootInActiveWindow ?: return emptyList()
+        val root = BlankAccessibilityService.instance?.rootInActiveWindow ?: return emptyList()
+        return collectFrom(root)
+    }
+
+    private fun collectFrom(root: AccessibilityNodeInfo): List<Pair<UiNode, AccessibilityNodeInfo>> {
         val out = mutableListOf<Pair<UiNode, AccessibilityNodeInfo>>()
         fun walk(node: AccessibilityNodeInfo, depth: Int) {
             if (depth > 40 || out.size >= 400) return

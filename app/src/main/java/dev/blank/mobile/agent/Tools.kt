@@ -13,6 +13,8 @@ import kotlinx.serialization.json.putJsonObject
 data class ToolSpec(val name: String, val description: String, val parameters: JsonObject)
 
 object Tools {
+    private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$")
+
     val all: List<ToolSpec> = listOf(
         ToolSpec(
             "device_observe",
@@ -67,6 +69,37 @@ object Tools {
                 putJsonArray("required") { add("action") }
             },
         ),
+        ToolSpec(
+            "phone_call",
+            "Control phone calls. dial opens the dialer prefilled; call places the call directly (requires user approval per number); answer accepts a ringing call; end hangs up the active call; state reports idle/ringing/offhook.",
+            buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("action") {
+                        put("type", "string")
+                        putJsonArray("enum") { listOf("dial", "call", "answer", "end", "state").forEach { add(it) } }
+                    }
+                    putJsonObject("number") { put("type", "string"); put("description", "Phone number, e.g. 010-1234-5678 or +82...") }
+                }
+                putJsonArray("required") { add("action") }
+            },
+        ),
+        ToolSpec(
+            "app_control",
+            "Manage apps. launch opens an app; list shows launchable apps with package names; install opens the system install confirmation — omit path to let the user pick the APK with the file chooser, or pass a readable .apk path; uninstall shows the system uninstall confirmation; force_stop opens app info and taps force stop.",
+            buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("action") {
+                        put("type", "string")
+                        putJsonArray("enum") { listOf("launch", "list", "install", "uninstall", "force_stop").forEach { add(it) } }
+                    }
+                    putJsonObject("package") { put("type", "string"); put("description", "Android package name, e.g. com.android.settings") }
+                    putJsonObject("path") { put("type", "string"); put("description", "Absolute path to a readable .apk file (install only; omit to open the file chooser)") }
+                }
+                putJsonArray("required") { add("action") }
+            },
+        ),
     )
 
     fun validate(name: String, args: JsonObject): JsonObject = when (name) {
@@ -74,7 +107,57 @@ object Tools {
             put("screenshot", args["screenshot"]?.jsonPrimitive?.booleanOrNull ?: false)
         }
         "device_act" -> validateAct(args)
+        "phone_call" -> validatePhone(args)
+        "app_control" -> validateApp(args)
         else -> throw IllegalArgumentException("unknown tool: $name")
+    }
+
+    fun redact(name: String, args: JsonObject): String {
+        if (name != "phone_call") return args.toString()
+        val raw = args["number"]?.jsonPrimitive?.let { if (it.isString) it.content else null } ?: return args.toString()
+        val normalized = PhoneNumber.normalize(raw) ?: return args.toString()
+        return buildJsonObject {
+            args.forEach { (key, value) ->
+                if (key == "number") put(key, PhoneNumber.mask(normalized)) else put(key, value)
+            }
+        }.toString()
+    }
+
+    private fun validatePhone(args: JsonObject): JsonObject {
+        val action = args.str("action") ?: throw IllegalArgumentException("action required")
+        if (action !in listOf("dial", "call", "answer", "end", "state")) {
+            throw IllegalArgumentException("invalid action: $action")
+        }
+        return buildJsonObject {
+            put("action", action)
+            if (action == "dial" || action == "call") {
+                val raw = args.str("number") ?: throw IllegalArgumentException("number required")
+                put("number", PhoneNumber.normalize(raw) ?: throw IllegalArgumentException("invalid number: $raw"))
+            }
+        }
+    }
+
+    private fun validateApp(args: JsonObject): JsonObject {
+        val action = args.str("action") ?: throw IllegalArgumentException("action required")
+        return buildJsonObject {
+            put("action", action)
+            when (action) {
+                "list" -> {}
+                "launch", "uninstall", "force_stop" -> {
+                    val pkg = args.str("package") ?: throw IllegalArgumentException("package required")
+                    if (!PACKAGE_NAME.matches(pkg)) throw IllegalArgumentException("invalid package: $pkg")
+                    put("package", pkg)
+                }
+                "install" -> {
+                    val path = args.str("path")
+                    if (path != null) {
+                        if (!path.endsWith(".apk")) throw IllegalArgumentException("path must be an .apk file")
+                        put("path", path)
+                    }
+                }
+                else -> throw IllegalArgumentException("invalid action: $action")
+            }
+        }
     }
 
     private fun validateAct(args: JsonObject): JsonObject {

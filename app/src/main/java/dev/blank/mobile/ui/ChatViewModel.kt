@@ -1,10 +1,14 @@
 package dev.blank.mobile.ui
 
+import android.Manifest
 import android.app.Application
+import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewModelScope
 import dev.blank.mobile.R
 import dev.blank.mobile.agent.AgentLoop
@@ -16,7 +20,9 @@ import dev.blank.mobile.agent.StoredMessage
 import dev.blank.mobile.agent.Tools
 import dev.blank.mobile.agent.titleFor
 import dev.blank.mobile.data.ConfigStore
+import dev.blank.mobile.device.AppControl
 import dev.blank.mobile.device.BlankAccessibilityService
+import dev.blank.mobile.device.CallControl
 import dev.blank.mobile.device.DeviceBridge
 import dev.blank.mobile.provider.ChatMessage
 import dev.blank.mobile.provider.HttpProvider
@@ -30,6 +36,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -41,6 +48,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
     val sessions = SessionStore(File(app.filesDir, "sessions"))
     private val http = HttpProvider()
     private val policy = ApprovalPolicy()
+    private val calls = CallControl(app)
+    private val apps = AppControl(app)
 
     var messages by mutableStateOf(listOf<UiMessage>())
         private set
@@ -54,17 +63,32 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var pendingApproval by mutableStateOf<ToolCallRef?>(null)
         private set
+    var phonePermissionsMissing by mutableStateOf(false)
+        private set
+    var pickRequest by mutableStateOf(false)
+        private set
 
     private var job: Job? = null
     private var createdAt = System.currentTimeMillis()
     private var approvalDeferred: CompletableDeferred<Boolean>? = null
+    private var installDeferred: CompletableDeferred<Uri?>? = null
     private var pendingShot: ImageAttachment? = null
 
     init {
+        refreshPermissions()
         viewModelScope.launch {
             BlankAccessibilityService.connected.collect { accessibilityConnected = it }
         }
     }
+
+    fun refreshPermissions() {
+        phonePermissionsMissing = !hasPermission(Manifest.permission.CALL_PHONE) ||
+            !hasPermission(Manifest.permission.ANSWER_PHONE_CALLS) ||
+            !hasPermission(Manifest.permission.READ_PHONE_STATE)
+    }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(getApplication(), permission) == PackageManager.PERMISSION_GRANTED
 
     fun send(text: String) {
         if (streaming || text.isBlank() || !config.configured) return
@@ -85,6 +109,8 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 streaming = false
                 pendingApproval = null
                 approvalDeferred = null
+                pickRequest = false
+                installDeferred = null
                 persist()
             }
         }
@@ -134,7 +160,7 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
             onText = { streamIntoAssistant(text = it) },
             onReasoning = { streamIntoAssistant(reasoning = it) },
             onToolStart = { call ->
-                messages = messages + UiMessage("tool", call.name + " " + call.arguments.take(160))
+                messages = messages + UiMessage("tool", describeCall(call))
             },
             onToolResult = { _, result -> completeToolCard(result) },
             onLimit = {
@@ -154,6 +180,20 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 observation.tree
             }
             "device_act" -> DeviceBridge.act(validated)
+            "phone_call" -> executePhone(validated)
+            "app_control" -> {
+                val pkg = validated["package"]?.jsonPrimitive?.content.orEmpty()
+                when (validated["action"]?.jsonPrimitive?.content) {
+                    "list" -> apps.list()
+                    "launch" -> apps.launch(pkg)
+                    "install" -> {
+                        val path = validated["path"]?.jsonPrimitive?.content
+                        if (path != null) apps.install(path) else installViaPicker()
+                    }
+                    "uninstall" -> apps.uninstall(pkg)
+                    else -> apps.forceStop(pkg)
+                }
+            }
             else -> "Unknown tool: ${call.name}"
         }
     } catch (e: CancellationException) {
@@ -162,8 +202,53 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
         "Error: ${e.message}"
     }
 
+    private suspend fun executePhone(args: JsonObject): String {
+        val number = args["number"]?.jsonPrimitive?.content.orEmpty()
+        return when (args["action"]?.jsonPrimitive?.content) {
+            "dial" -> calls.dial(number)
+            "call" ->
+                if (hasPermission(Manifest.permission.CALL_PHONE)) calls.call(number)
+                else "Permission required: CALL_PHONE. Ask the user to grant the phone permission, then retry."
+            "answer" -> calls.answer()
+            "end" -> calls.end()
+            else -> calls.state()
+        }
+    }
+
+    private suspend fun installViaPicker(): String {
+        val deferred = CompletableDeferred<Uri?>()
+        installDeferred = deferred
+        pickRequest = true
+        val uri = deferred.await()
+        pickRequest = false
+        installDeferred = null
+        if (uri == null) return "Install cancelled by the user"
+        val app = getApplication<Application>()
+        val target = File(app.cacheDir, "picked.apk")
+        return try {
+            val input = app.contentResolver.openInputStream(uri) ?: return "Cannot read the picked file"
+            input.use { source -> target.outputStream().use { source.copyTo(it) } }
+            apps.install(target.absolutePath)
+        } catch (e: Exception) {
+            "Error: ${e.message}"
+        }
+    }
+
+    fun completeInstallPick(uri: Uri?) {
+        installDeferred?.complete(uri)
+    }
+
+    fun describeCall(call: ToolCallRef): String {
+        val args = try {
+            Json.parseToJsonElement(call.arguments.ifBlank { "{}" }).jsonObject
+        } catch (_: Exception) {
+            return call.name + " " + call.arguments.take(160)
+        }
+        return (call.name + " " + Tools.redact(call.name, args)).take(200)
+    }
+
     private suspend fun approveTool(call: ToolCallRef): Boolean {
-        if (policy.decide(call.name) == ApprovalDecision.ALLOW) return true
+        if (policy.decide(call) == ApprovalDecision.ALLOW) return true
         val deferred = CompletableDeferred<Boolean>()
         approvalDeferred = deferred
         pendingApproval = call
@@ -175,12 +260,13 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
 
     fun decideApproval(allow: Boolean, always: Boolean = false) {
         val call = pendingApproval ?: return
-        if (allow && always) policy.allowAlways(call.name)
+        if (allow && always) policy.allowAlways(call)
         approvalDeferred?.complete(allow)
     }
 
     fun stop() {
         approvalDeferred?.complete(false)
+        installDeferred?.complete(null)
         job?.cancel()
     }
 
@@ -254,6 +340,10 @@ class ChatViewModel(app: Application) : AndroidViewModel(app) {
                 "Workflow: call device_observe to read the screen, then device_act to interact, then observe again to verify. " +
                 "Prefer selector (text/desc/id/index from the latest device_observe) over raw coordinates. " +
                 "Use action=type for text input; Korean is fully supported. " +
+                "phone_call handles dial/call/answer/end/state (number required for dial and call). " +
+                "app_control handles launch/list/install/uninstall/force_stop. " +
+                "For install, omit path to open the file chooser so the user picks the APK; only pass a path when the file is already readable by the app. " +
+                "System install/uninstall confirmations belong to the user: never tap their OK/Install/Update buttons yourself; after opening one, tell the user to approve it on screen. " +
                 "Take small steps and verify the result of each action. " +
                 "When the task is complete, reply with a brief summary in the user's language and no tool calls."
     }

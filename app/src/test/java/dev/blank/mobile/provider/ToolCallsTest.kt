@@ -19,7 +19,7 @@ class ToolCallsTest {
     fun openaiBodyIncludesToolsAndToolMessages() {
         val body = OpenAiCompat.body("m", "sys", toolHistory, tools = Tools.all)
         val tools = body["tools"]!!.jsonArray
-        assertEquals(2, tools.size)
+        assertEquals(Tools.all.size, tools.size)
         assertEquals("device_observe", tools[0].jsonObject["function"]!!.jsonObject["name"]!!.jsonPrimitive.content)
         val messages = body["messages"]!!.jsonArray
         val assistant = messages[2].jsonObject

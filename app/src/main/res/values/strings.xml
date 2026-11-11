@@ -31,6 +31,8 @@
     <string name="accessibility_enable">켜기</string>
     <string name="accessibility_battery_note">일부 기기는 접근성 서비스를 자동으로 종료해요. 배터리 최적화 예외로 설정하면 안정적으로 동작합니다.</string>
     <string name="accessibility_battery_button">배터리 설정</string>
+    <string name="phone_permission_banner">전화 걸기·받기를 사용하려면 전화 권한이 필요해요.</string>
+    <string name="phone_permission_button">권한 허용</string>
     <string name="approval_title">이 작업을 허용할까요?</string>
     <string name="approval_allow">허용</string>
     <string name="approval_deny">거부</string>

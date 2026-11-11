@@ -1,7 +1,10 @@
 package dev.blank.mobile.ui
 
+import android.Manifest
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,6 +55,16 @@ import dev.blank.mobile.R
 fun ChatScreen(vm: ChatViewModel, onSessions: () -> Unit, onSettings: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val phonePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        vm.refreshPermissions()
+    }
+    val installPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        vm.completeInstallPick(uri)
+    }
+    LaunchedEffect(vm.pickRequest) {
+        if (vm.pickRequest) installPickerLauncher.launch(arrayOf("application/vnd.android.package-archive"))
+    }
+    LaunchedEffect(Unit) { vm.refreshPermissions() }
     LaunchedEffect(vm.messages.size, vm.messages.lastOrNull()?.content?.length, vm.messages.lastOrNull()?.reasoning?.length) {
         if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.lastIndex)
     }
@@ -150,8 +163,33 @@ fun ChatScreen(vm: ChatViewModel, onSessions: () -> Unit, onSettings: () -> Unit
                     }
                 }
             }
+            if (vm.phonePermissionsMissing) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.phone_permission_banner),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = {
+                            phonePermissionLauncher.launch(arrayOf(Manifest.permission.CALL_PHONE, Manifest.permission.ANSWER_PHONE_CALLS, Manifest.permission.READ_PHONE_STATE))
+                        }) {
+                            Text(stringResource(R.string.phone_permission_button))
+                        }
+                    }
+                }
+            }
             vm.pendingApproval?.let { call ->
-                ApprovalCard(call = call, onDecide = { allow, always -> vm.decideApproval(allow, always) })
+                ApprovalCard(detail = vm.describeCall(call), onDecide = { allow, always -> vm.decideApproval(allow, always) })
             }
             vm.error?.let { error ->
                 Text(

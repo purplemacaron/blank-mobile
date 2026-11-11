@@ -17,10 +17,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.blank.mobile.R
-import dev.blank.mobile.provider.ToolCallRef
 
 @Composable
-fun ApprovalCard(call: ToolCallRef, onDecide: (allow: Boolean, always: Boolean) -> Unit) {
+fun ApprovalCard(detail: String, onDecide: (allow: Boolean, always: Boolean) -> Unit) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -33,7 +32,7 @@ fun ApprovalCard(call: ToolCallRef, onDecide: (allow: Boolean, always: Boolean) 
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )
             Text(
-                call.name + " " + call.arguments.take(200),
+                detail,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
             )

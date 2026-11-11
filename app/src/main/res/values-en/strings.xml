@@ -31,6 +31,8 @@
     <string name="accessibility_enable">Enable</string>
     <string name="accessibility_battery_note">Some devices stop accessibility services automatically. Exempting blank mobile from battery optimization keeps it running reliably.</string>
     <string name="accessibility_battery_button">Battery settings</string>
+    <string name="phone_permission_banner">Phone permission is needed to make and answer calls.</string>
+    <string name="phone_permission_button">Grant</string>
     <string name="approval_title">Allow this action?</string>
     <string name="approval_allow">Allow</string>
     <string name="approval_deny">Deny</string>
