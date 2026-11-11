@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.BlankMobile" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.BlankMobile.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_green</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="postSplashScreenTheme">@style/Theme.BlankMobile</item>
+    </style>
+</resources>
