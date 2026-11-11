@@ -4,12 +4,17 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
@@ -21,9 +26,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -38,8 +46,12 @@ import dev.blank.mobile.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(onSessions: () -> Unit, onSettings: () -> Unit) {
+fun ChatScreen(vm: ChatViewModel, onSessions: () -> Unit, onSettings: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
+    val listState = rememberLazyListState()
+    LaunchedEffect(vm.messages.size, vm.messages.lastOrNull()?.content?.length, vm.messages.lastOrNull()?.reasoning?.length) {
+        if (vm.messages.isNotEmpty()) listState.animateScrollToItem(vm.messages.lastIndex)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -56,25 +68,44 @@ fun ChatScreen(onSessions: () -> Unit, onSettings: () -> Unit) {
         },
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_mark),
-                        contentDescription = null,
-                        modifier = Modifier.size(72.dp),
-                    )
-                    Text(stringResource(R.string.chat_empty_title), style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        stringResource(R.string.chat_empty_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                    )
+            if (vm.messages.isEmpty()) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.ic_mark),
+                            contentDescription = null,
+                            modifier = Modifier.size(72.dp),
+                        )
+                        Text(stringResource(R.string.chat_empty_title), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(if (vm.config.configured) R.string.chat_ready_hint else R.string.chat_not_configured),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(vm.messages) { message -> MessageBubble(message) }
+                }
+            }
+            vm.error?.let { error ->
+                Text(
+                    error,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth().imePadding().padding(12.dp),
@@ -89,10 +120,64 @@ fun ChatScreen(onSessions: () -> Unit, onSettings: () -> Unit) {
                     shape = RoundedCornerShape(24.dp),
                     maxLines = 4,
                 )
-                IconButton(onClick = {}, enabled = false) {
-                    Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                if (vm.streaming) {
+                    TextButton(onClick = { vm.stop() }) {
+                        Text(stringResource(R.string.stop))
+                    }
+                } else {
+                    IconButton(
+                        onClick = {
+                            vm.send(draft)
+                            draft = ""
+                        },
+                        enabled = draft.isNotBlank() && vm.config.configured,
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = stringResource(R.string.send))
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MessageBubble(message: UiMessage) {
+    val isUser = message.role == "user"
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+    ) {
+        if (!isUser && message.reasoning.isNotBlank()) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.widthIn(max = 320.dp).padding(bottom = 4.dp),
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Text(
+                        stringResource(R.string.reasoning_label),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        message.reasoning,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.widthIn(max = 320.dp),
+        ) {
+            Text(
+                message.content.ifBlank { "…" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            )
         }
     }
 }

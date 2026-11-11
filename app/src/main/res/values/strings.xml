@@ -2,12 +2,28 @@
 <resources>
     <string name="app_name">blank mobile</string>
     <string name="chat_empty_title">무엇을 도와드릴까요?</string>
-    <string name="chat_empty_hint">설정에서 모델을 연결하면 대화를 시작할 수 있습니다.</string>
     <string name="composer_hint">메시지 입력</string>
     <string name="send">보내기</string>
     <string name="sessions">세션</string>
     <string name="settings">설정</string>
     <string name="back">뒤로</string>
     <string name="sessions_empty">아직 세션이 없습니다</string>
-    <string name="settings_placeholder">설정 화면은 다음 업데이트에서 제공됩니다.</string>
+    <string name="stop">중단</string>
+    <string name="reasoning_label">추론</string>
+    <string name="chat_not_configured">설정에서 프로바이더와 모델을 연결하세요.</string>
+    <string name="chat_ready_hint">메시지를 보내면 대화를 시작합니다.</string>
+    <string name="settings_provider">프로바이더</string>
+    <string name="settings_base_url">베이스 URL</string>
+    <string name="settings_api_key">API 키</string>
+    <string name="settings_model">모델</string>
+    <string name="settings_fetch_models">모델 불러오기</string>
+    <string name="settings_save">저장</string>
+    <string name="settings_saved">저장되었습니다.</string>
+    <string name="settings_fetch_failed">모델 목록을 가져오지 못했습니다.</string>
+    <string name="settings_saved_key">저장된 키: %1$s</string>
+    <string name="sessions_new">새 대화</string>
+    <string name="sessions_untitled">제목 없음</string>
+    <string name="sessions_delete">삭제</string>
+    <string name="sessions_delete_confirm">이 세션을 삭제할까요?</string>
+    <string name="cancel">취소</string>
 </resources>

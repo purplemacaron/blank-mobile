@@ -2,12 +2,28 @@
 <resources>
     <string name="app_name">blank mobile</string>
     <string name="chat_empty_title">What can I help with?</string>
-    <string name="chat_empty_hint">Connect a model in Settings to start a conversation.</string>
     <string name="composer_hint">Message</string>
     <string name="send">Send</string>
     <string name="sessions">Sessions</string>
     <string name="settings">Settings</string>
     <string name="back">Back</string>
     <string name="sessions_empty">No sessions yet</string>
-    <string name="settings_placeholder">Settings arrive in the next update.</string>
+    <string name="stop">Stop</string>
+    <string name="reasoning_label">Reasoning</string>
+    <string name="chat_not_configured">Connect a provider and model in Settings.</string>
+    <string name="chat_ready_hint">Send a message to start.</string>
+    <string name="settings_provider">Provider</string>
+    <string name="settings_base_url">Base URL</string>
+    <string name="settings_api_key">API key</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_fetch_models">Fetch models</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_saved">Saved.</string>
+    <string name="settings_fetch_failed">Could not fetch the model list.</string>
+    <string name="settings_saved_key">Saved key: %1$s</string>
+    <string name="sessions_new">New chat</string>
+    <string name="sessions_untitled">Untitled</string>
+    <string name="sessions_delete">Delete</string>
+    <string name="sessions_delete_confirm">Delete this session?</string>
+    <string name="cancel">Cancel</string>
 </resources>

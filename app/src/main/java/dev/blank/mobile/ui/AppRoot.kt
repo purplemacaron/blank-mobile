@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 sealed interface Screen {
     data object Chat : Screen
@@ -33,13 +34,26 @@ val ScreenSaver = Saver<Screen, String>(
 
 @Composable
 fun AppRoot() {
+    val vm: ChatViewModel = viewModel()
     var screen by rememberSaveable(stateSaver = ScreenSaver) { mutableStateOf<Screen>(Screen.Chat) }
     when (screen) {
         Screen.Chat -> ChatScreen(
+            vm = vm,
             onSessions = { screen = Screen.Sessions },
             onSettings = { screen = Screen.Settings },
         )
-        Screen.Sessions -> SessionsScreen(onBack = { screen = Screen.Chat })
-        Screen.Settings -> SettingsScreen(onBack = { screen = Screen.Chat })
+        Screen.Sessions -> SessionsScreen(
+            sessions = vm.sessions,
+            onBack = { screen = Screen.Chat },
+            onOpen = { id ->
+                vm.openSession(id)
+                screen = Screen.Chat
+            },
+            onNew = {
+                vm.newSession()
+                screen = Screen.Chat
+            },
+        )
+        Screen.Settings -> SettingsScreen(config = vm.config, onBack = { screen = Screen.Chat })
     }
 }
