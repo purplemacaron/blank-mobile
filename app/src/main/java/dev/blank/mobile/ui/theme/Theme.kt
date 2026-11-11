@@ -1,9 +1,12 @@
 package dev.blank.mobile.ui.theme
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 
 private val Green = Color(0xFF16A34A)
 private val GreenDeep = Color(0xFF15803D)
@@ -31,10 +34,33 @@ private val LightColors = lightColorScheme(
     outlineVariant = Color(0xFFEDF0F4),
 )
 
+private fun TextStyle.gothic() = copy(fontFamily = FontFamily.SansSerif)
+
+private val GothicTypography = Typography().let { base ->
+    Typography(
+        displayLarge = base.displayLarge.gothic(),
+        displayMedium = base.displayMedium.gothic(),
+        displaySmall = base.displaySmall.gothic(),
+        headlineLarge = base.headlineLarge.gothic(),
+        headlineMedium = base.headlineMedium.gothic(),
+        headlineSmall = base.headlineSmall.gothic(),
+        titleLarge = base.titleLarge.gothic(),
+        titleMedium = base.titleMedium.gothic(),
+        titleSmall = base.titleSmall.gothic(),
+        bodyLarge = base.bodyLarge.gothic(),
+        bodyMedium = base.bodyMedium.gothic(),
+        bodySmall = base.bodySmall.gothic(),
+        labelLarge = base.labelLarge.gothic(),
+        labelMedium = base.labelMedium.gothic(),
+        labelSmall = base.labelSmall.gothic(),
+    )
+}
+
 @Composable
 fun BlankMobileTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = LightColors,
+        typography = GothicTypography,
         content = content,
     )
 }
